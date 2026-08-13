@@ -7,7 +7,6 @@ import {
   segmentGraphemes,
   shimmerPosition,
   shouldRenderStreamEvent,
-  shouldRunAnimationTimer,
   spinnerGlyph,
 } from "../src/animation.ts";
 import { hexToOklab, oklabToHex, shimmerColor } from "../src/config.ts";
@@ -41,14 +40,9 @@ describe("animation", () => {
     expect(mapped).toMatch(/^#[0-9a-f]{6}$/);
   });
 
-  test("uses the requested clock rates and no reduced-motion timer", () => {
-    expect(animationIntervalMs(StreamMode.Requesting, false)).toBe(50);
-    expect(animationIntervalMs(StreamMode.Thinking, false)).toBe(100);
-    expect(animationIntervalMs(StreamMode.Responding, true)).toBeUndefined();
-    expect(shouldRunAnimationTimer(true, true, true, false)).toBe(true);
-    expect(shouldRunAnimationTimer(false, true, true, false)).toBe(false);
-    expect(shouldRunAnimationTimer(true, false, true, false)).toBe(false);
-    expect(shouldRunAnimationTimer(true, true, true, true)).toBe(false);
+  test("uses faster frames while requesting", () => {
+    expect(animationIntervalMs(StreamMode.Requesting)).toBe(50);
+    expect(animationIntervalMs(StreamMode.Thinking)).toBe(100);
   });
 
   test("throttles ordinary streaming deltas but renders mode transitions", () => {
@@ -60,6 +54,8 @@ describe("animation", () => {
     expect(shouldRenderStreamEvent("toolcall_delta", true)).toBe(true);
     expect(shouldRenderStreamEvent("text_end", false)).toBe(true);
     expect(shouldRenderStreamEvent("text_delta", false, true)).toBe(true);
+    expect(shouldRenderStreamEvent("thinking_delta", false, true)).toBe(false);
+    expect(shouldRenderStreamEvent("toolcall_delta", false, true)).toBe(false);
   });
 
   test("cosine spinner phases and Ghostty final frame are stable", () => {

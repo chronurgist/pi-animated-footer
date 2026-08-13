@@ -31,7 +31,6 @@ export function chooseVerb(
 }
 
 export interface ToolCallState {
-  readonly id: string;
   readonly name: string;
   readonly args: unknown;
   readonly startedAt: number;
@@ -250,7 +249,7 @@ export class TurnState {
 
   startTool(id: string, name: string, args: unknown, now: number): void {
     this.mode = StreamMode.ToolUse;
-    this.tools.set(id, { id, name, args, startedAt: now });
+    this.tools.set(id, { name, args, startedAt: now });
     this.latestToolId = id;
   }
 

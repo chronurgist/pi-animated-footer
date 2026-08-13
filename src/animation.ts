@@ -31,21 +31,8 @@ export interface GraphemeSegment {
   readonly width: number;
 }
 
-export function animationIntervalMs(
-  mode: StreamMode,
-  reducedMotion: boolean,
-): number | undefined {
-  if (reducedMotion) return undefined;
+export function animationIntervalMs(mode: StreamMode): number {
   return mode === StreamMode.Requesting ? 50 : 100;
-}
-
-export function shouldRunAnimationTimer(
-  isTui: boolean,
-  sessionActive: boolean,
-  turnActive: boolean,
-  reducedMotion: boolean,
-): boolean {
-  return isTui && sessionActive && turnActive && !reducedMotion;
 }
 
 export function shouldRenderStreamEvent(
@@ -53,7 +40,7 @@ export function shouldRenderStreamEvent(
   modeChanged: boolean,
   reducedMotion = false,
 ): boolean {
-  if (reducedMotion) return true;
+  if (reducedMotion && type === "text_delta") return true;
   switch (type) {
     case "thinking_delta":
     case "text_delta":

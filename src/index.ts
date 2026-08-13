@@ -8,7 +8,6 @@ import {
   animationIntervalMs,
   renderIndicator,
   shouldRenderStreamEvent,
-  shouldRunAnimationTimer,
 } from "./animation.ts";
 import {
   colorForModel,
@@ -104,21 +103,18 @@ export default async function (pi: ExtensionAPI): Promise<void> {
 
   const ensureRefreshTimer = (ctx: ExtensionContext, now: number): void => {
     if (
-      !shouldRunAnimationTimer(
-        ctx.mode === "tui",
-        sessionActive,
-        turnActive,
-        reducedMotion,
-      )
+      ctx.mode !== "tui" ||
+      !sessionActive ||
+      !turnActive ||
+      reducedMotion
     ) {
       clearRefreshTimer();
       return;
     }
     const mode = state.view(now, ctx.thinkingLevel).mode;
-    const nextInterval = animationIntervalMs(mode, reducedMotion);
+    const nextInterval = animationIntervalMs(mode);
     if (nextInterval === timerInterval && refreshTimer !== undefined) return;
     clearRefreshTimer();
-    if (nextInterval === undefined || !sessionActive || !turnActive) return;
     timerInterval = nextInterval;
     refreshTimer = setInterval(() => {
       const activeContext = currentContext;

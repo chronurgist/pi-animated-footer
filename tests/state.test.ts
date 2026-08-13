@@ -4,6 +4,7 @@ import {
   activeToolMessage,
   catchUpCharacters,
   normalizeStreamEvent,
+  StreamMode,
   TurnState,
 } from "../src/state.ts";
 
@@ -26,7 +27,7 @@ describe("TurnState", () => {
     const state = new TurnState();
     state.startTurn(1_000, () => 0);
     state.acceptStreamEvent(normalizeStreamEvent(event), 2_000);
-    expect(state.view(2_000, undefined).mode).toBe("tool-use");
+    expect(state.view(2_000, undefined).mode).toBe(StreamMode.ToolUse);
   });
 
   test("maps stream events to modes and status metadata", () => {
@@ -36,14 +37,14 @@ describe("TurnState", () => {
 
     expect(state.acceptStreamEvent("thinking_start", 100)).toBe(true);
     expect(state.acceptStreamEvent("thinking_delta", 150)).toBe(false);
-    expect(state.view(150, "high").mode).toBe("thinking");
+    expect(state.view(150, "high").mode).toBe(StreamMode.Thinking);
     expect(state.view(399, "high").metadata).toEqual([]);
     expect(state.view(400, "high").metadata).toEqual([
       "thinking with high effort",
     ]);
 
     expect(state.acceptStreamEvent("text_start", 500)).toBe(true);
-    expect(state.view(500, undefined).mode).toBe("responding");
+    expect(state.view(500, undefined).mode).toBe(StreamMode.Responding);
     expect(state.view(500, undefined).primary).toBe("Thinking…");
   });
 
