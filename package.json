@@ -1,0 +1,29 @@
+{
+  "name": "pi-claude-style-spinner",
+  "version": "0.1.0",
+  "description": "A Claude-style animated working indicator for Pi with model colors and useful tool messages.",
+  "type": "module",
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.1",
+    "@earendil-works/pi-ai": ">=0.84.1",
+    "@earendil-works/pi-tui": ">=0.84.1"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.84.1",
+    "@earendil-works/pi-coding-agent": "0.84.1",
+    "@earendil-works/pi-tui": "0.84.1",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "preview": "bun run src/preview.ts"
+  }
+}
