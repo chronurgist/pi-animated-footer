@@ -170,6 +170,43 @@ describe("TurnState", () => {
     expect(state.view(37_000, undefined).stalledIntensity).toBe(0.5);
   });
 
+  test("eases color recovery from thinking and stalled warning intensity", () => {
+    const thinking = new TurnState();
+    thinking.startTurn(0, () => 0);
+    thinking.acceptStreamEvent("thinking_start", 0);
+    thinking.acceptStreamEvent("thinking_end", 20_000);
+
+    expect(thinking.view(20_000, undefined).recoveryIntensity).toBe(1);
+    expect(thinking.view(20_150, undefined).recoveryIntensity).toBeCloseTo(0.1976, 3);
+    expect(thinking.view(20_300, undefined).recoveryIntensity).toBe(0);
+
+    const stalled = new TurnState();
+    stalled.startTurn(0, () => 0);
+    stalled.acceptStreamEvent("text_start", 0);
+    stalled.acceptStreamEvent("text_delta", 0, true);
+    expect(stalled.view(10_000, undefined).stalledIntensity).toBe(0);
+    expect(stalled.view(20_000, undefined).stalledIntensity).toBe(1);
+    stalled.acceptStreamEvent("text_delta", 20_000, true);
+    expect(stalled.view(20_000, undefined).recoveryIntensity).toBe(1);
+  });
+
+  test("keeps recovery continuous across renewed warning activity and reduced motion", () => {
+    const state = new TurnState();
+    state.startTurn(0, () => 0);
+    state.acceptStreamEvent("thinking_start", 0);
+    state.acceptStreamEvent("thinking_end", 20_000);
+    const beforeRenewal = state.view(20_150, undefined).recoveryIntensity;
+
+    state.acceptStreamEvent("thinking_start", 20_150);
+    expect(state.view(20_150, undefined).recoveryIntensity).toBe(beforeRenewal);
+    const beforeSecondRecovery = state.view(20_200, undefined).recoveryIntensity;
+    state.acceptStreamEvent("thinking_end", 20_200);
+    expect(state.view(20_200, undefined).recoveryIntensity).toBe(beforeSecondRecovery);
+
+    expect(state.view(20_250, undefined, true).recoveryIntensity).toBe(0);
+    expect(state.view(20_250, undefined).recoveryIntensity).toBe(0);
+  });
+
   test("derives tool text and config-gated timer metadata", () => {
     const disabled = new TurnState();
     disabled.startTurn(10_000, () => 0.2);

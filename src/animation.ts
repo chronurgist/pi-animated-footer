@@ -115,6 +115,10 @@ function intensityColor(base: HexColor, intensity: number): HexColor {
   );
 }
 
+function workingIntensity(view: WorkingView): number {
+  return Math.max(view.thinkingIntensity, view.stalledIntensity, view.recoveryIntensity);
+}
+
 function coloredGlimmer(
   message: string,
   base: HexColor,
@@ -161,7 +165,7 @@ export function renderWorkingMessage(
   reducedMotion: boolean,
   shimmer = shimmerColor(color),
 ): string {
-  const intensity = Math.max(view.thinkingIntensity, view.stalledIntensity);
+  const intensity = workingIntensity(view);
   const base = intensityColor(color, intensity);
   const glimmer = intensityColor(shimmer, intensity);
   const noMovingBand = reducedMotion || view.stalledIntensity > 0;
@@ -199,7 +203,7 @@ export function renderIndicator(
   shimmer = shimmerColor(color),
 ): IndicatorRender {
   const glyph = reducedMotion ? "●" : spinnerGlyph(elapsedMs, ghostty);
-  const intensity = Math.max(view.thinkingIntensity, view.stalledIntensity);
+  const intensity = workingIntensity(view);
   const spinnerColor = intensityColor(color, intensity);
   return {
     frames: [ansiColor(spinnerColor, glyph)],

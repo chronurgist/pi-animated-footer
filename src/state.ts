@@ -42,6 +42,7 @@ export interface WorkingView {
   readonly metadata: readonly string[];
   readonly thinkingIntensity: number;
   readonly stalledIntensity: number;
+  readonly recoveryIntensity: number;
 }
 
 const ELLIPSIS = "…";
@@ -50,6 +51,7 @@ const TOOL_TIMER_THRESHOLD = 2_000;
 const ELAPSED_TIME_DELAY = 16_000;
 const SHORT_STATUS_WINDOW = 2_000;
 const RESPONSE_CATCH_UP_MS = 50;
+const RECOVERY_MS = 300;
 
 export function catchUpCharacters(displayed: number, target: number): number {
   const remainder = Math.max(0, target - displayed);
@@ -111,6 +113,17 @@ export function rampIntensity(elapsed: number, delay = 10_000, ramp = 10_000): n
   return Math.max(0, Math.min(1, (elapsed - delay) / ramp));
 }
 
+/** Invert x(t) for CSS ease, then evaluate y(t). */
+function cssEase(progress: number): number {
+  const target = Math.max(0, Math.min(1, progress));
+  let t = target;
+  for (let i = 0; i < 5; i += 1) {
+    const x = 0.75 * t * (1 - t) + t ** 3;
+    t -= (x - target) / (0.75 - 1.5 * t + 3 * t ** 2);
+  }
+  return 0.3 * t * (1 - t) ** 2 + 3 * t ** 2 * (1 - t) + t ** 3;
+}
+
 export class TurnState {
   constructor(
     private readonly verbs: readonly string[] = VERBS,
@@ -121,6 +134,8 @@ export class TurnState {
   private verb = "Working";
   private mode: StreamMode = StreamMode.Requesting;
   private thinkingStartedAt: number | undefined;
+  private recoveryStartedAt = 0;
+  private recoveryFrom = 0;
   private thoughtForMs: number | undefined;
   private thoughtForUntil = 0;
   private lastResponseAt: number | undefined;
@@ -149,6 +164,7 @@ export class TurnState {
     this.startedAt = startedAt;
     this.mode = StreamMode.Requesting;
     this.thinkingStartedAt = undefined;
+    this.recoveryFrom = 0;
     this.thoughtForMs = undefined;
     this.thoughtForUntil = 0;
     this.lastResponseAt = undefined;
@@ -183,6 +199,7 @@ export class TurnState {
         this.responseBlocks.clear();
         break;
       case "thinking_start":
+        if (this.mode === StreamMode.Responding) this.startRecovery(now);
         this.mode = StreamMode.Thinking;
         this.thinkingStartedAt = now;
         this.thoughtForMs = undefined;
@@ -199,11 +216,15 @@ export class TurnState {
       case "text_delta":
       case "text_end":
         this.mode = StreamMode.Responding;
-        if (contentArrived) this.lastResponseAt = now;
+        if (contentArrived) {
+          this.startRecovery(now);
+          this.lastResponseAt = now;
+        }
         break;
       case "toolcall_start":
       case "toolcall_delta":
       case "toolcall_end":
+        if (this.mode === StreamMode.Responding) this.startRecovery(now);
         this.mode = StreamMode.ToolInput;
         break;
       case "done:toolUse":
@@ -262,8 +283,30 @@ export class TurnState {
     if (this.latestToolId === id) this.latestToolId = [...this.tools.keys()].at(-1);
   }
 
+  private activeIntensity(now: number): number {
+    return Math.max(
+      this.thinkingStartedAt === undefined ? 0 : rampIntensity(now - this.thinkingStartedAt),
+      this.mode === StreamMode.Responding && this.lastResponseAt !== undefined
+        ? rampIntensity(now - this.lastResponseAt) : 0,
+    );
+  }
+
+  private recoveryAt(now: number): number {
+    if (this.recoveryFrom === 0) return 0;
+    const progress = Math.max(0, Math.min(1, (now - this.recoveryStartedAt) / RECOVERY_MS));
+    return this.recoveryFrom * (1 - cssEase(progress));
+  }
+
+  private startRecovery(now: number): void {
+    const active = this.activeIntensity(now);
+    if (active === 0) return;
+    this.recoveryFrom = Math.max(active, this.recoveryAt(now));
+    this.recoveryStartedAt = now;
+  }
+
   private finishThinking(now: number): void {
     if (this.thinkingStartedAt === undefined) return;
+    this.startRecovery(now);
     this.thoughtForMs = Math.max(0, now - this.thinkingStartedAt);
     this.thoughtForUntil = now + SHORT_STATUS_WINDOW;
     this.thinkingStartedAt = undefined;
@@ -285,6 +328,8 @@ export class TurnState {
       ? rampIntensity(now - this.thinkingStartedAt) : 0;
     const stalledIntensity = !reducedMotion && this.mode === StreamMode.Responding && this.lastResponseAt !== undefined
       ? rampIntensity(now - this.lastResponseAt) : 0;
+    if (reducedMotion) this.recoveryFrom = 0;
+    const recoveryIntensity = reducedMotion ? 0 : this.recoveryAt(now);
     const displayedCharacters = reducedMotion
       ? this.responseCharacters
       : this.displayedCharacters;
@@ -301,6 +346,7 @@ export class TurnState {
       metadata,
       thinkingIntensity,
       stalledIntensity,
+      recoveryIntensity,
     };
   }
 

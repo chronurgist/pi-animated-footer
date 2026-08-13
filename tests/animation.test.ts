@@ -18,6 +18,7 @@ const view = (overrides: Partial<WorkingView> = {}): WorkingView => ({
   metadata: ["12s", "thinking"],
   thinkingIntensity: 0,
   stalledIntensity: 0,
+  recoveryIntensity: 0,
   ...overrides,
 });
 
@@ -109,7 +110,17 @@ describe("animation", () => {
     expect(intense).not.toBe(normal);
   });
 
-  test("thinking and stalled intensity apply bold and stop the moving band", () => {
+  test("recovery colors both spinner and verb without changing emphasis", () => {
+    const recovered = renderIndicator(
+      view({ recoveryIntensity: 0.4 }),
+      "#D77757",
+      false,
+      2_200,
+    );
+    expect(colors(recovered.message)).toContain(colors(recovered.frames[0])[0]!);
+    expect(recovered.message).not.toContain("\x1b[1m");
+    expect(new Set(colors(recovered.message)).size).toBe(2);
+
     const thinking = renderWorkingMessage(
       view({ thinkingIntensity: 0.6 }),
       "#D77757",
