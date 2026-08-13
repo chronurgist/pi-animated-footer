@@ -77,7 +77,7 @@ export function sanitizeTerminalText(value: string): string {
 
 function short(value: string | undefined, fallback: string): string {
   const readable = sanitizeTerminalText(value ?? fallback).trim() || fallback;
-  return readable.length > 56 ? `${readable.slice(0, 53)}…` : readable;
+  return readable.length > 56 ? readable.slice(0, 53) : readable;
 }
 
 export function activeToolMessage(name: string, args: unknown): string | undefined {

@@ -228,5 +228,7 @@ describe("TurnState", () => {
       "ran tool for 3s",
     ]);
     expect(state.view(13_000, undefined, true).metadata).toEqual([]);
+    state.startTool("2", "bash", { command: "x".repeat(57) }, 13_000);
+    expect(state.view(13_000, undefined).primary).toBe(`Running ${"x".repeat(53)}…`);
   });
 });
