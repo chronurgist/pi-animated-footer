@@ -1,4 +1,4 @@
-# Claude-style Spinner for Pi
+# Animated footer for Pi
 
 A Pi extension that renders a model-colored working indicator while the agent is active. It provides:
 
@@ -9,17 +9,15 @@ A Pi extension that renders a model-colored working indicator while the agent is
 - Thinking and stalled-response status metadata.
 - Reduced-motion support.
 
-The extension uses Pi's public extension API. It does not replace tools or modify Pi internals.
-
 ## Install
 
-Load the extension directly:
+Install from GitHub:
 
 ```sh
-pi -e ./src/index.ts
+pi install git:github.com/chronurgist/pi-animated-footer
 ```
 
-When installed as a Pi package, the `pi` field in `package.json` loads `src/index.ts` automatically.
+For local development, load the extension directly:
 
 ## Configure
 
