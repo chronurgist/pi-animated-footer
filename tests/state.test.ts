@@ -6,7 +6,7 @@ import {
   normalizeStreamEvent,
   StreamMode,
   TurnState,
-} from "../src/state.ts";
+} from "../state.ts";
 
 describe("TurnState", () => {
   test("uses one configured verb for a turn", () => {

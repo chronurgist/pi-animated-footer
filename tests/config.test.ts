@@ -12,8 +12,8 @@ import {
   oklchToOklab,
   parseFlairConfig,
   shimmerForModel,
-} from "../src/config.ts";
-import { VERBS } from "../src/state.ts";
+} from "../config.ts";
+import { VERBS } from "../state.ts";
 
 describe("model colors", () => {
   test("uses the longest case-insensitive substring", () => {

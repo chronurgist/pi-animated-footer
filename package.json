@@ -6,7 +6,7 @@
   "license": "MIT",
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./index.ts"
     ]
   },
   "peerDependencies": {
@@ -25,6 +25,6 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "preview": "bun run src/preview.ts"
+    "preview": "bun run preview.ts"
   }
 }

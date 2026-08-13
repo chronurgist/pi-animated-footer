@@ -8,9 +8,9 @@ import {
   shimmerPosition,
   shouldRenderStreamEvent,
   spinnerGlyph,
-} from "../src/animation.ts";
-import { hexToOklab, oklabToHex, shimmerColor } from "../src/config.ts";
-import { StreamMode, type WorkingView } from "../src/state.ts";
+} from "../animation.ts";
+import { hexToOklab, oklabToHex, shimmerColor } from "../config.ts";
+import { StreamMode, type WorkingView } from "../state.ts";
 
 const view = (overrides: Partial<WorkingView> = {}): WorkingView => ({
   mode: StreamMode.Responding,
