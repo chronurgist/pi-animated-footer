@@ -1,6 +1,10 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
-import { renderIndicator, segmentGraphemes } from "./animation.ts";
+import {
+  stripTerminalSequences,
+  truncateToWidth,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
+import { renderIndicator } from "./animation.ts";
 import {
   configuredModelColors,
   type FlairConfig,
@@ -15,11 +19,6 @@ const ROW_PREFIX_WIDTH = 24;
 const MAX_KEY_WIDTH = 28;
 const ENTER_SCREEN = "\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l";
 const LEAVE_SCREEN = "\x1b[0m\x1b[?25h\x1b[?1049l";
-const ANSI_CSI = new RegExp(
-  `${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`,
-  "g",
-);
-
 type Timer = ReturnType<typeof setInterval>;
 
 export interface PreviewRow {
@@ -45,21 +44,6 @@ function cleanKey(key: string): string {
   return key.replace(/\p{Cc}/gu, " ").trim();
 }
 
-function truncateColumns(text: string, maxWidth: number): string {
-  if (maxWidth <= 0) return "";
-  if (visibleWidth(text) <= maxWidth) return text;
-  if (maxWidth === 1) return "…";
-
-  let output = "";
-  let width = 0;
-  for (const segment of segmentGraphemes(text)) {
-    if (width + segment.width > maxWidth - 1) break;
-    output += segment.text;
-    width += segment.width;
-  }
-  return `${output}…`;
-}
-
 function padColumns(text: string, width: number): string {
   return `${text}${" ".repeat(Math.max(0, width - visibleWidth(text)))}`;
 }
@@ -73,10 +57,6 @@ function workingView(primary: string): WorkingView {
     stalledIntensity: 0,
     recoveryIntensity: 0,
   };
-}
-
-function stripAnsi(text: string): string {
-  return text.replace(ANSI_CSI, "");
 }
 
 function layout(
@@ -113,8 +93,8 @@ function renderRow(
   dimensions: PreviewLayout,
 ): string {
   const { keyWidth, messageWidth } = dimensions;
-  const key = truncateColumns(cleanKey(row.key), keyWidth);
-  const primary = truncateColumns(`${key} is Thinking…`, messageWidth);
+  const key = truncateToWidth(cleanKey(row.key), keyWidth, "…");
+  const primary = truncateToWidth(`${key} is Thinking…`, messageWidth, "…");
   const rendered = renderIndicator(
     workingView(primary),
     row.color,
@@ -134,7 +114,7 @@ function staticTable(rows: readonly PreviewRow[]): string {
   const header = `${padColumns("MODEL", keyWidth)}  BASE     SHIMMER  MESSAGE`;
   const lines = rows.map((row) => {
     const key = cleanKey(row.key);
-    const message = stripAnsi(
+    const message = stripTerminalSequences(
       renderIndicator(workingView(`${key} is Thinking…`), row.color, false, 0)
         .message,
     );
@@ -219,7 +199,7 @@ function formatHeader(
   terminalWidth: number,
 ): string {
   const { keyWidth, messageWidth } = layout(rows, terminalWidth);
-  return `${padColumns(truncateColumns("MODEL", keyWidth), keyWidth)}  BASE     SHIMMER  ${truncateColumns("MESSAGE", messageWidth)}`;
+  return `${padColumns(truncateToWidth("MODEL", keyWidth, "…"), keyWidth)}  BASE     SHIMMER  ${truncateToWidth("MESSAGE", messageWidth, "…")}`;
 }
 
 async function main(): Promise<void> {
