@@ -92,6 +92,7 @@ export default async function (pi: ExtensionAPI): Promise<void> {
       elapsed,
       undefined,
       shimmer,
+      process.stdout.columns,
     );
     const indicatorFrame = rendered.frames[0];
     if (indicatorFrame !== lastIndicatorFrame) {

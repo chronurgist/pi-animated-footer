@@ -9,8 +9,13 @@ import { StreamMode, type StreamEvent, type WorkingView } from "./state.ts";
 
 export const SPINNER_FRAMES = ["·", "✢", "✳", "✶", "✻", "✽"] as const;
 const CYCLE_MS = 2_000;
+const THINKING_PULSE_START_MS = 3_000;
+const THINKING_PULSE_MS = 2_000;
+const THINKING_PULSE_DIM = "#999999" as HexColor;
+const THINKING_PULSE_BRIGHT = "#B9B9B9" as HexColor;
 const WARNING = "#D97706" as HexColor;
 const ERROR = "#DC2626" as HexColor;
+const WORKING_ROW_EDGE_PADDING = 2;
 const RESET = "\x1b[0m";
 const DIM = "\x1b[2m";
 const BOLD = "\x1b[1m";
@@ -105,6 +110,45 @@ function clamp(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+/** Match Claude's status pulse, which uses rounded sRGB channel interpolation. */
+function interpolateRgb(
+  from: HexColor,
+  to: HexColor,
+  amount: number,
+): HexColor {
+  const t = clamp(amount);
+  const channel = (offset: number): string =>
+    Math.round(
+      Number.parseInt(from.slice(offset, offset + 2), 16) +
+        (Number.parseInt(to.slice(offset, offset + 2), 16) -
+          Number.parseInt(from.slice(offset, offset + 2), 16)) * t,
+    )
+      .toString(16)
+      .padStart(2, "0");
+  return `#${channel(1)}${channel(3)}${channel(5)}` as HexColor;
+}
+
+function thinkingStatusColor(
+  elapsedMs: number,
+  thinkingIntensity: number,
+): HexColor {
+  const pulse = elapsedMs < THINKING_PULSE_START_MS
+    ? 0
+    : (Math.sin(
+        ((elapsedMs - THINKING_PULSE_START_MS) / THINKING_PULSE_MS) *
+          Math.PI *
+          2,
+      ) + 1) / 2;
+  const neutral = interpolateRgb(
+    THINKING_PULSE_DIM,
+    THINKING_PULSE_BRIGHT,
+    pulse,
+  );
+  return thinkingIntensity > 0
+    ? interpolateRgb(neutral, WARNING, thinkingIntensity)
+    : neutral;
+}
+
 function intensityColor(base: HexColor, intensity: number): HexColor {
   const warningAmount = clamp(intensity * 2);
   const errorAmount = clamp(intensity * 2 - 1);
@@ -151,10 +195,80 @@ function coloredGlimmer(
   return output;
 }
 
-function renderMetadata(metadata: readonly string[]): string {
+function isActiveThinkingStatus(value: string): boolean {
+  return /^(?:thinking|still thinking|thinking more|thinking some more|almost done thinking)(?: with .+ effort)?$/.test(value);
+}
+
+function isSemanticStatus(value: string): boolean {
+  return (
+    isActiveThinkingStatus(value) ||
+    value.startsWith("running tool for ") ||
+    value.startsWith("ran tool for ") ||
+    value.startsWith("thought for ")
+  );
+}
+
+function metadataWidth(metadata: readonly string[]): number {
   return metadata.length === 0
-    ? ""
-    : ` ${DIM}(${metadata.join(" · ")})${RESET}`;
+    ? 0
+    : 1 + visibleWidth(`(${metadata.join(" · ")})`);
+}
+
+function renderMetadata(
+  metadata: readonly string[],
+  thinkingColor: HexColor,
+  availableWidth = Number.POSITIVE_INFINITY,
+): string {
+  if (metadata.length === 0) return "";
+
+  let statusIndex = -1;
+  for (let index = metadata.length - 1; index >= 0; index -= 1) {
+    if (isSemanticStatus(metadata[index]!)) {
+      statusIndex = index;
+      break;
+    }
+  }
+
+  let statusText = statusIndex >= 0 ? metadata[statusIndex] : undefined;
+  if (statusText !== undefined && metadataWidth([statusText]) > availableWidth) {
+    if (
+      isActiveThinkingStatus(statusText) &&
+      statusText !== "thinking" &&
+      metadataWidth(["thinking"]) <= availableWidth
+    ) {
+      statusText = "thinking";
+    } else {
+      statusText = undefined;
+    }
+  }
+
+  const selectedIndexes = new Set<number>();
+  const selectedForBudget: string[] = [];
+  if (statusText !== undefined) {
+    selectedIndexes.add(statusIndex);
+    selectedForBudget.push(statusText);
+  }
+
+  for (let index = 0; index < metadata.length; index += 1) {
+    if (index === statusIndex) continue;
+    const candidate = metadata[index]!;
+    if (metadataWidth([...selectedForBudget, candidate]) <= availableWidth) {
+      selectedIndexes.add(index);
+      selectedForBudget.push(candidate);
+    }
+  }
+
+  const items = metadata
+    .map((item, index) => {
+      if (!selectedIndexes.has(index)) return undefined;
+      const text = index === statusIndex ? statusText! : item;
+      return isActiveThinkingStatus(text)
+        ? ansiColor(thinkingColor, text)
+        : `${DIM}${text}${RESET}`;
+    })
+    .filter((item): item is string => item !== undefined);
+  if (items.length === 0) return "";
+  return ` ${DIM}(${RESET}${items.join(`${DIM} · ${RESET}`)}${DIM})${RESET}`;
 }
 
 /** Render the primary message independently from dim, non-shimmered metadata. */
@@ -164,6 +278,7 @@ export function renderWorkingMessage(
   elapsedMs: number,
   reducedMotion: boolean,
   shimmer = shimmerColor(color),
+  availableWidth = Number.POSITIVE_INFINITY,
 ): string {
   const intensity = workingIntensity(view);
   const base = intensityColor(color, intensity);
@@ -187,7 +302,15 @@ export function renderWorkingMessage(
   }
 
   if (view.thinkingIntensity > 0.5) primary = `${BOLD}${primary}${RESET}`;
-  return `${primary}${renderMetadata(view.metadata)}`;
+  const statusColor = thinkingStatusColor(
+    elapsedMs,
+    view.thinkingIntensity,
+  );
+  return `${primary}${renderMetadata(
+    view.metadata,
+    statusColor,
+    availableWidth,
+  )}`;
 }
 
 /**
@@ -201,10 +324,19 @@ export function renderIndicator(
   elapsedMs = 0,
   ghostty = isGhostty(),
   shimmer = shimmerColor(color),
+  terminalWidth?: number,
 ): IndicatorRender {
   const glyph = reducedMotion ? "●" : spinnerGlyph(elapsedMs, ghostty);
   const intensity = workingIntensity(view);
   const spinnerColor = intensityColor(color, intensity);
+  const metadataWidth = terminalWidth === undefined
+    ? Number.POSITIVE_INFINITY
+    : Math.max(
+        0,
+        terminalWidth -
+          visibleWidth(`${glyph} ${view.primary}`) -
+          WORKING_ROW_EDGE_PADDING,
+      );
   return {
     frames: [ansiColor(spinnerColor, glyph)],
     message: renderWorkingMessage(
@@ -213,6 +345,7 @@ export function renderIndicator(
       elapsedMs,
       reducedMotion,
       shimmer,
+      metadataWidth,
     ),
   };
 }

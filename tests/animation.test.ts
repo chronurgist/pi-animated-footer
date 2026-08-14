@@ -9,7 +9,12 @@ import {
   shouldRenderStreamEvent,
   spinnerGlyph,
 } from "../animation.ts";
-import { hexToOklab, oklabToHex, shimmerColor } from "../config.ts";
+import {
+  ansiColor,
+  hexToOklab,
+  oklabToHex,
+  shimmerColor,
+} from "../config.ts";
 import { StreamMode, type WorkingView } from "../state.ts";
 
 const view = (overrides: Partial<WorkingView> = {}): WorkingView => ({
@@ -86,7 +91,8 @@ describe("animation", () => {
     const output = renderWorkingMessage(view(), "#D77757", 2_200, false);
     expect(output).toContain("12s");
     expect(output).toContain("\x1b[2m");
-    expect(colors(output).length).toBe(2);
+    expect(colors(output).length).toBe(3);
+    expect(output).toContain(ansiColor("#999999", "thinking"));
 
     const flash = renderWorkingMessage(
       view({ mode: StreamMode.ToolUse, metadata: [] }),
@@ -95,6 +101,46 @@ describe("animation", () => {
       false,
     );
     expect(new Set(colors(flash)).size).toBe(1);
+  });
+
+  test("pulses the active thinking status and fits metadata to the row", () => {
+    const dim = renderWorkingMessage(view(), "#D77757", 2_200, false);
+    const bright = renderWorkingMessage(view(), "#D77757", 3_500, false);
+    expect(dim).toContain(ansiColor("#999999", "thinking"));
+    expect(bright).toContain(ansiColor("#B9B9B9", "thinking"));
+
+    const fallback = renderWorkingMessage(
+      view({ metadata: ["thinking with high effort"] }),
+      "#D77757",
+      0,
+      false,
+      undefined,
+      11,
+    );
+    expect(fallback).toContain(ansiColor("#999999", "thinking"));
+    expect(fallback).not.toContain("high effort");
+
+    const omitted = renderWorkingMessage(
+      view({ metadata: ["thinking"] }),
+      "#D77757",
+      0,
+      false,
+      undefined,
+      10,
+    );
+    expect(omitted).not.toContain("thinking");
+
+    const fitted = renderIndicator(
+      view(),
+      "#D77757",
+      false,
+      0,
+      false,
+      undefined,
+      16,
+    ).message;
+    expect(fitted).toContain("12s");
+    expect(fitted).not.toContain("thinking");
   });
 
   test("fully rendered frame colors change when model or intensity changes", () => {
@@ -119,7 +165,7 @@ describe("animation", () => {
     );
     expect(colors(recovered.message)).toContain(colors(recovered.frames[0])[0]!);
     expect(recovered.message).not.toContain("\x1b[1m");
-    expect(new Set(colors(recovered.message)).size).toBe(2);
+    expect(new Set(colors(recovered.message)).size).toBe(3);
 
     const thinking = renderWorkingMessage(
       view({ thinkingIntensity: 0.6 }),
@@ -135,6 +181,6 @@ describe("animation", () => {
       0,
       false,
     );
-    expect(new Set(colors(stalled)).size).toBe(1);
+    expect(new Set(colors(stalled)).size).toBe(2);
   });
 });
