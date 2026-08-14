@@ -53,13 +53,33 @@ const SHORT_STATUS_WINDOW = 2_000;
 const RESPONSE_CATCH_UP_MS = 50;
 const RECOVERY_MS = 300;
 
+const COMPACT_TOKEN_FORMATTER = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+  minimumFractionDigits: 1,
+});
+const TOKEN_FORMATTER = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+  minimumFractionDigits: 0,
+});
+
+/** Match Claude's compact token formatting, including its lowercase suffixes. */
+export function formatTokenCount(tokens: number): string {
+  const count = Math.max(0, Math.round(tokens));
+  return (count >= 1_000
+    ? COMPACT_TOKEN_FORMATTER
+    : TOKEN_FORMATTER
+  ).format(count).toLowerCase();
+}
+
 export function catchUpCharacters(displayed: number, target: number): number {
   const remainder = Math.max(0, target - displayed);
   if (remainder === 0) return displayed;
-  const increment = remainder < 10
+  const increment = remainder < 70
     ? 3
-    : remainder < 100
-      ? Math.max(8, Math.floor(remainder * 0.15))
+    : remainder < 200
+      ? Math.max(8, Math.ceil(remainder * 0.15))
       : 50;
   return Math.min(target, displayed + increment);
 }
@@ -333,11 +353,11 @@ export class TurnState {
     const displayedCharacters = reducedMotion
       ? this.responseCharacters
       : this.displayedCharacters;
-    const tokens = Math.round(displayedCharacters / 4);
-    const tokenEstimate = tokens > 0
-      ? `${this.mode === StreamMode.Requesting ? "↑" : "↓"} ${tokens} tokens`
+    const tokenEstimate = Math.round(displayedCharacters / 4);
+    const tokenMetadata = tokenEstimate > 0
+      ? `${this.mode === StreamMode.Requesting ? "↑" : "↓"} ${formatTokenCount(tokenEstimate)} tokens`
       : undefined;
-    const metadata = [elapsed, tokenEstimate, status].filter(
+    const metadata = [elapsed, tokenMetadata, status].filter(
       (item): item is string => Boolean(item),
     );
     return {

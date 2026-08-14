@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   activeToolMessage,
   catchUpCharacters,
+  formatTokenCount,
   normalizeStreamEvent,
   StreamMode,
   TurnState,
@@ -50,8 +51,8 @@ describe("TurnState", () => {
 
   test("smooths streamed character estimates without counting text_end twice", () => {
     expect(catchUpCharacters(0, 2)).toBe(2);
-    expect(catchUpCharacters(0, 50)).toBe(8);
-    expect(catchUpCharacters(0, 128)).toBe(50);
+    expect(catchUpCharacters(0, 50)).toBe(3);
+    expect(catchUpCharacters(0, 128)).toBe(20);
 
     const state = new TurnState();
     state.startTurn(0, () => 0);
@@ -70,8 +71,34 @@ describe("TurnState", () => {
 
     expect(state.view(1, undefined).metadata).toEqual([]);
     state.advanceResponse(50);
-    expect(state.view(50, undefined).metadata).toEqual(["↓ 13 tokens"]);
+    expect(state.view(50, undefined).metadata).toEqual(["↓ 5 tokens"]);
     expect(state.view(50, undefined, true).metadata).toEqual(["↓ 32 tokens"]);
+  });
+
+  test("formats token counts compactly", () => {
+    expect(formatTokenCount(999)).toBe("999");
+    expect(formatTokenCount(1_200)).toBe("1.2k");
+    expect(formatTokenCount(98_000)).toBe("98.0k");
+    expect(formatTokenCount(1_200_000)).toBe("1.2m");
+  });
+
+  test("uses response length for tokens and the stream mode for the arrow", () => {
+    const state = new TurnState();
+    state.startTurn(1_000, () => 0);
+    expect(state.view(1_000, undefined).metadata).toEqual([]);
+
+    state.acceptStreamEvent(
+      "text_delta",
+      1_000,
+      true,
+      { contentIndex: 0, deltaLength: 4_000, contentLength: 4_000 },
+    );
+    expect(state.view(1_000, undefined, true).metadata).toEqual([
+      "↓ 1.0k tokens",
+    ]);
+
+    state.startTurn(2_000, () => 0);
+    expect(state.view(2_000, undefined).metadata).toEqual([]);
   });
 
   test("reduced motion refreshes live token metadata and suppresses clock statuses", () => {
