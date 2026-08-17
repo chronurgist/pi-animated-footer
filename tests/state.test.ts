@@ -75,6 +75,49 @@ describe("TurnState", () => {
     expect(state.view(50, undefined, true).metadata).toEqual(["↓ 32 tokens"]);
   });
 
+  test("counts thinking signature progress for the down-arrow estimate", () => {
+    const state = new TurnState();
+    state.startTurn(1_000, () => 0);
+    state.acceptStreamEvent("thinking_start", 1_000);
+    state.acceptStreamEvent(
+      "thinking_delta",
+      1_000,
+      false,
+      { contentIndex: 0, deltaLength: 128, contentLength: 128 },
+    );
+
+    expect(state.view(1_000, undefined, true).metadata).toEqual([
+      "↓ 32 tokens",
+    ]);
+  });
+
+  test("corrects raw tool-call progress when final JSON is shorter", () => {
+    const state = new TurnState();
+    state.startTurn(1_000, () => 0);
+    state.acceptStreamEvent(
+      "toolcall_delta",
+      1_000,
+      false,
+      { contentIndex: 0, deltaLength: 10 },
+    );
+    expect(state.view(1_000, undefined, true).metadata).toEqual([
+      "↓ 3 tokens",
+    ]);
+
+    state.acceptStreamEvent(
+      "toolcall_end",
+      1_000,
+      false,
+      { contentIndex: 0, contentLength: 8 },
+    );
+    expect(state.view(1_000, undefined, true).metadata).toEqual([
+      "↓ 2 tokens",
+    ]);
+
+    state.resetResponseProgress(2_000);
+    expect(state.view(2_000, undefined, true).metadata).toEqual([]);
+  });
+
   test("formats token counts compactly", () => {
     expect(formatTokenCount(999)).toBe("999");
     expect(formatTokenCount(1_200)).toBe("1.2k");
@@ -97,8 +140,20 @@ describe("TurnState", () => {
       "↓ 1.0k tokens",
     ]);
 
-    state.startTurn(2_000, () => 0);
-    expect(state.view(2_000, undefined).metadata).toEqual([]);
+    state.acceptStreamEvent("start", 2_000);
+    expect(state.view(2_000, undefined, true).metadata).toEqual([
+      "↑ 1.0k tokens",
+    ]);
+
+    state.acceptStreamEvent(
+      "text_delta",
+      2_000,
+      true,
+      { contentIndex: 0, deltaLength: 4, contentLength: 4 },
+    );
+    expect(state.view(2_000, undefined, true).metadata).toEqual([
+      "↓ 1.0k tokens",
+    ]);
   });
 
   test("reduced motion refreshes live token metadata and suppresses clock statuses", () => {

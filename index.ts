@@ -1,4 +1,7 @@
-import type { AssistantMessageEvent } from "@earendil-works/pi-ai";
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+} from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -16,7 +19,11 @@ import {
   loadFlairConfig,
   shimmerForModel,
 } from "./config.ts";
-import { normalizeStreamEvent, TurnState } from "./state.ts";
+import {
+  normalizeStreamEvent,
+  type ContentProgress,
+  TurnState,
+} from "./state.ts";
 
 const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 
@@ -39,21 +46,79 @@ function contentArrived(event: AssistantMessageEvent): boolean {
   );
 }
 
-function textProgress(event: AssistantMessageEvent): {
-  readonly contentIndex: number;
-  readonly deltaLength?: number;
-  readonly contentLength?: number;
-} | undefined {
-  if (event.type === "text_end") {
-    return { contentIndex: event.contentIndex, contentLength: event.content.length };
+function serializedLength(value: unknown): number | undefined {
+  try {
+    return JSON.stringify(value)?.length;
+  } catch {
+    return undefined;
   }
-  if (event.type !== "text_delta") return undefined;
-  const block = event.partial.content[event.contentIndex];
+}
+
+function thinkingLength(block: {
+  readonly thinkingSignature?: string;
+  readonly redacted?: boolean;
+}): number {
+  const signatureLength = block.thinkingSignature?.length ?? 0;
+  return block.redacted ? signatureLength : Math.round(signatureLength * 0.75);
+}
+
+function assistantBlockProgress(
+  contentIndex: number,
+  block: AssistantMessage["content"][number],
+): ContentProgress {
   return {
-    contentIndex: event.contentIndex,
-    deltaLength: event.delta.length,
-    contentLength: block?.type === "text" ? block.text.length : undefined,
+    contentIndex,
+    contentLength: block.type === "text"
+      ? block.text.length
+      : block.type === "thinking"
+        ? thinkingLength(block)
+        : serializedLength(block.arguments),
   };
+}
+
+function contentProgress(event: AssistantMessageEvent): readonly ContentProgress[] {
+  if (event.type === "done") {
+    return event.message.content.map((block, index) =>
+      assistantBlockProgress(index, block));
+  }
+  if (event.type === "error") {
+    return event.error.content.map((block, index) =>
+      assistantBlockProgress(index, block));
+  }
+  if (event.type === "text_end") {
+    return [{ contentIndex: event.contentIndex, contentLength: event.content.length }];
+  }
+  if (event.type === "thinking_end") {
+    const block = event.partial.content[event.contentIndex];
+    return [{
+      contentIndex: event.contentIndex,
+      contentLength: block?.type === "thinking"
+        ? thinkingLength(block)
+        : event.content.length,
+    }];
+  }
+  if (event.type === "toolcall_end") {
+    return [{
+      contentIndex: event.contentIndex,
+      contentLength: serializedLength(event.toolCall.arguments),
+    }];
+  }
+  if (event.type === "toolcall_delta") {
+    return [{ contentIndex: event.contentIndex, deltaLength: event.delta.length }];
+  }
+  if (event.type === "text_delta" || event.type === "thinking_delta") {
+    const block = event.partial.content[event.contentIndex];
+    return [{
+      contentIndex: event.contentIndex,
+      contentLength: block?.type === "text"
+        ? block.text.length
+        : block?.type === "thinking"
+          ? thinkingLength(block)
+          : undefined,
+      deltaLength: event.delta.length,
+    }];
+  }
+  return [];
 }
 
 export default async function (pi: ExtensionAPI): Promise<void> {
@@ -167,9 +232,13 @@ export default async function (pi: ExtensionAPI): Promise<void> {
   pi.on("turn_start", async (_event, ctx) => {
     if (!sessionActive) return;
     const now = Date.now();
-    turnActive = true;
-    state.startTurn(now);
     animationStartedAt = now;
+    if (turnActive) {
+      state.acceptStreamEvent("start", now);
+    } else {
+      state.startTurn(now);
+    }
+    turnActive = true;
     refresh(ctx, now);
   });
 
@@ -181,7 +250,7 @@ export default async function (pi: ExtensionAPI): Promise<void> {
       type,
       Date.now(),
       contentArrived(streamEvent),
-      textProgress(streamEvent),
+      contentProgress(streamEvent),
     );
     if (shouldRenderStreamEvent(type, modeChanged, reducedMotion)) refresh(ctx);
   });
@@ -195,6 +264,12 @@ export default async function (pi: ExtensionAPI): Promise<void> {
   pi.on("tool_execution_end", async (event, ctx) => {
     if (!sessionActive) return;
     state.endTool(event.toolCallId, Date.now());
+    refresh(ctx);
+  });
+
+  pi.on("session_before_compact", async (_event, ctx) => {
+    if (!sessionActive) return;
+    state.resetResponseProgress(Date.now());
     refresh(ctx);
   });
 

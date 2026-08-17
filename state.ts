@@ -10,6 +10,12 @@ export enum StreamMode {
 
 export type StreamEvent = AssistantMessageEvent["type"] | "done:toolUse";
 
+export interface ContentProgress {
+  readonly contentIndex: number;
+  readonly deltaLength?: number;
+  readonly contentLength?: number;
+}
+
 /** Normalize the one stream event whose reason changes its UI mode. */
 export function normalizeStreamEvent(event: AssistantMessageEvent): StreamEvent {
   return event.type === "done" && event.reason === "toolUse"
@@ -202,20 +208,18 @@ export class TurnState {
     type: StreamEvent,
     now: number,
     contentArrived = false,
-    textProgress?: {
-      readonly contentIndex: number;
-      readonly deltaLength?: number;
-      readonly contentLength?: number;
-    },
+    contentProgress?: ContentProgress | readonly ContentProgress[],
   ): boolean {
     const previousMode = this.mode;
-    if (textProgress !== undefined) this.recordTextProgress(textProgress);
+    const progresses = contentProgress === undefined
+      ? []
+      : Array.isArray(contentProgress) ? contentProgress : [contentProgress];
+    for (const progress of progresses) this.recordContentProgress(progress);
     switch (type) {
       case "start":
+        this.startedAt = now;
         this.mode = StreamMode.Requesting;
-        this.responseCharacters = 0;
-        this.displayedCharacters = 0;
-        this.displayedCharactersAt = now;
+        // Keep the response estimate across tool turns so requesting can show ↑.
         this.responseBlocks.clear();
         break;
       case "thinking_start":
