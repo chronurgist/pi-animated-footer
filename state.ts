@@ -103,11 +103,17 @@ function short(value: string | undefined, fallback: string): string {
   return readable.length > 56 ? readable.slice(0, 53) : readable;
 }
 
-export function activeToolMessage(name: string, args: unknown): string | undefined {
+export function activeToolMessage(
+  name: string,
+  args: unknown,
+  showBashToolMessage = true,
+): string | undefined {
   const input = typeof args === "object" && args !== null ? args as Record<string, unknown> : {};
   switch (name.toLowerCase()) {
     case "read": return `Reading ${short(asString(input.path), "file")}`;
-    case "bash": return `Running ${short(asString(input.command), "command")}`;
+    case "bash": return showBashToolMessage
+      ? `Running ${short(asString(input.command), "command")}`
+      : undefined;
     case "grep": return `Searching ${short(asString(input.pattern), "files")}`;
     case "find": return `Finding ${short(asString(input.pattern), "files")}`;
     case "ls": return `Listing ${short(asString(input.path), ".")}`;
@@ -151,6 +157,7 @@ export class TurnState {
   constructor(
     private readonly verbs: readonly string[] = VERBS,
     private readonly toolTimers = false,
+    private readonly showBashToolMessage = true,
   ) {}
 
   private startedAt = 0;
@@ -349,7 +356,11 @@ export class TurnState {
     reducedMotion = false,
   ): WorkingView {
     const activeTool = this.latestToolId ? this.tools.get(this.latestToolId) : undefined;
-    const primary = `${activeToolMessage(activeTool?.name ?? "", activeTool?.args) ?? this.verb}${ELLIPSIS}`;
+    const primary = `${activeToolMessage(
+      activeTool?.name ?? "",
+      activeTool?.args,
+      this.showBashToolMessage,
+    ) ?? this.verb}${ELLIPSIS}`;
     const status = reducedMotion ? undefined : this.semanticStatus(now, effort);
     const elapsed = !reducedMotion && this.startedAt > 0 &&
       (status !== undefined || now - this.startedAt >= ELAPSED_TIME_DELAY)

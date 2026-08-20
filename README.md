@@ -37,11 +37,12 @@ Configuration is read from the global file `~/.pi/agent/flair.json`:
     "mode": "append",
     "verbs": ["CustomVerb"]
   },
-  "toolTimers": false
+  "toolTimers": false,
+  "showBashToolMessage": false
 }
 ```
 
-Color and shimmer keys are case-insensitive substrings of `provider/modelId`; the longest match wins. Invalid colors are ignored. `spinnerVerbs.mode` is either `append` or `replace`.
+Color and shimmer keys are case-insensitive substrings of `provider/modelId`; the longest match wins. Invalid colors are ignored. `spinnerVerbs.mode` is either `append` or `replace`. Set `showBashToolMessage` to `true` to show `Running <cmd>` while Bash is active.
 
 The built-in model families are `deepseek`, `claude`, `gemini`, `gpt`, `qwen`, `glm`, `minimax`, `gemma`, `nvidia`, and `kimi`.
 

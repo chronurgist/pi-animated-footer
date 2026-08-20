@@ -17,6 +17,7 @@ export interface FlairConfig {
   readonly fallback: HexColor;
   readonly spinnerVerbs?: SpinnerVerbConfig;
   readonly toolTimers: boolean;
+  readonly showBashToolMessage: boolean;
 }
 
 export interface Rgb {
@@ -59,6 +60,7 @@ export const DEFAULT_FLAIR_CONFIG: FlairConfig = Object.freeze({
   fallback: FALLBACK_COLOR,
   spinnerVerbs: undefined,
   toolTimers: false,
+  showBashToolMessage: false,
 });
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -134,6 +136,7 @@ export function parseFlairConfig(raw: string): FlairConfig {
       fallback: validColor(parsed.fallback) ? parsed.fallback : FALLBACK_COLOR,
       spinnerVerbs: parseSpinnerVerbs(parsed.spinnerVerbs),
       toolTimers: parsed.toolTimers === true,
+      showBashToolMessage: parsed.showBashToolMessage === true,
     };
   } catch {
     return DEFAULT_FLAIR_CONFIG;

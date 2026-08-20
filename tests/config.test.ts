@@ -120,6 +120,8 @@ describe("model colors", () => {
     expect(parseFlairConfig("not json").fallback).toBe(FALLBACK_COLOR);
     expect(parseFlairConfig("{}").toolTimers).toBe(false);
     expect(parseFlairConfig('{"toolTimers":true}').toolTimers).toBe(true);
+    expect(parseFlairConfig("{}").showBashToolMessage).toBe(false);
+    expect(parseFlairConfig('{"showBashToolMessage":true}').showBashToolMessage).toBe(true);
     expect(BUILTIN_COLORS.claude).toBe("#D77757");
   });
 });

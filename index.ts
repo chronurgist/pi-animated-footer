@@ -123,7 +123,11 @@ function contentProgress(event: AssistantMessageEvent): readonly ContentProgress
 
 export default async function (pi: ExtensionAPI): Promise<void> {
   const config: FlairConfig = await loadFlairConfig(getAgentDir());
-  const state = new TurnState(configuredSpinnerVerbs(config), config.toolTimers);
+  const state = new TurnState(
+    configuredSpinnerVerbs(config),
+    config.toolTimers,
+    config.showBashToolMessage,
+  );
   const reducedMotion = reducedMotionEnabled();
   let currentContext: ExtensionContext | undefined;
   let refreshTimer: Timer | undefined;

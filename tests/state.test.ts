@@ -295,7 +295,7 @@ describe("TurnState", () => {
     disabled.startTool("1", "read", { path: "src/index.ts" }, 10_000);
     expect(disabled.view(12_100, undefined).metadata).toEqual([]);
 
-    const state = new TurnState(undefined, true);
+    const state = new TurnState(undefined, true, true);
     state.startTurn(10_000, () => 0.2);
     state.startTool("1", "read", { path: "src/index.ts" }, 10_000);
     expect(state.view(11_000, undefined).primary).toBe("Reading src/index.ts…");
@@ -312,5 +312,10 @@ describe("TurnState", () => {
     expect(state.view(13_000, undefined, true).metadata).toEqual([]);
     state.startTool("2", "bash", { command: "x".repeat(57) }, 13_000);
     expect(state.view(13_000, undefined).primary).toBe(`Running ${"x".repeat(53)}…`);
+
+    const hidden = new TurnState(undefined, false, false);
+    hidden.startTurn(10_000, () => 0.2);
+    hidden.startTool("1", "bash", { command: "pwd" }, 10_000);
+    expect(hidden.view(10_000, undefined).primary).not.toContain("Running ");
   });
 });
