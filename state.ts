@@ -1,4 +1,7 @@
 import type { AssistantMessageEvent } from "@earendil-works/pi-ai";
+import { VERBS } from "./spinner-verbs.ts";
+
+export { VERBS };
 
 export enum StreamMode {
   ToolInput = "tool-input",
@@ -22,12 +25,6 @@ export function normalizeStreamEvent(event: AssistantMessageEvent): StreamEvent 
     ? "done:toolUse"
     : event.type;
 }
-
-export const VERBS = [
-  "Thinking", "Working", "Crafting", "Reasoning", "Exploring", "Inspecting",
-  "Preparing", "Considering", "Mapping", "Checking", "Planning", "Synthesizing",
-  "Investigating", "Formulating", "Reviewing",
-] as const;
 
 export function chooseVerb(
   random: () => number = Math.random,
