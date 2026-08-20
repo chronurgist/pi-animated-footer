@@ -32,7 +32,7 @@ describe("TurnState", () => {
   });
 
   test("maps stream events to modes and status metadata", () => {
-    const state = new TurnState();
+    const state = new TurnState(["Thinking"]);
     state.startTurn(0, () => 0);
     expect(state.view(0, undefined).primary).toBe("Thinking…");
 

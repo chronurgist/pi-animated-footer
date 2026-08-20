@@ -276,17 +276,27 @@ export class TurnState {
     this.displayedCharactersAt += ticks * RESPONSE_CATCH_UP_MS;
   }
 
-  private recordTextProgress(progress: {
-    readonly contentIndex: number;
-    readonly deltaLength?: number;
-    readonly contentLength?: number;
-  }): void {
+  private recordContentProgress(progress: ContentProgress): void {
     const previous = this.responseBlocks.get(progress.contentIndex) ?? 0;
     const observed = progress.contentLength ??
       previous + Math.max(0, progress.deltaLength ?? 0);
-    if (observed <= previous) return;
+    if (observed === previous) return;
     this.responseBlocks.set(progress.contentIndex, observed);
-    this.responseCharacters += observed - previous;
+    this.responseCharacters = Math.max(
+      0,
+      this.responseCharacters + observed - previous,
+    );
+    this.displayedCharacters = Math.min(
+      this.displayedCharacters,
+      this.responseCharacters,
+    );
+  }
+
+  resetResponseProgress(now: number): void {
+    this.responseCharacters = 0;
+    this.displayedCharacters = 0;
+    this.displayedCharactersAt = now;
+    this.responseBlocks.clear();
   }
 
   startTool(id: string, name: string, args: unknown, now: number): void {
